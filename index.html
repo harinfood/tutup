@@ -1,47 +1,216 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Harinfood Sedang Libur</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Kedai Harinfood</title>
+    <style>
+        :root {
+            --primary: #f26522; /* Warna khas e-commerce segar */
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
+        body { background-color: var(--light); color: var(--dark); padding-bottom: 80px; }
+        header { background-color: white; padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); sticky: top; }
+        header h1 { color: var(--primary); font-size: 1.5rem; }
+        
+        .container { max-width: 600px; margin: 20px auto; padding: 0 15px; }
+        
+        .section-title { margin-bottom: 10px; font-size: 1.1rem; border-left: 4px solid var(--primary); padding-left: 8px; }
+        
+        /* Grid Menu */
+        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
+        .menu-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; cursor: pointer; transition: transform 0.1s; }
+        .menu-card:active { transform: scale(0.95); }
+        .menu-card h3 { font-size: 1rem; margin-bottom: 5px; }
+        .menu-card p { color: var(--primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 10px; }
+        .btn-add { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 6px; width: 100%; font-weight: bold; }
 
-<link rel="stylesheet" href="style.css">
+        /* Keranjang */
+        .cart-box { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 0.95rem; }
+        .cart-item-qty { display: flex; align-items: center; gap: 10px; }
+        .btn-qty { background: #e0e0e0; border: none; width: 25px; height: 25px; border-radius: 50%; font-weight: bold; cursor: pointer; }
+        
+        /* Footer Bar */
+        .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto; }
+        .total-section h4 { font-size: 0.85rem; color: #7f8c8d; }
+        .total-section p { font-size: 1.3rem; font-weight: bold; color: var(--primary); }
+        .btn-checkout { background: #27ae60; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        .btn-checkout:disabled { background: #bdc3c7; }
+        
+        #loading { text-align: center; padding: 20px; font-weight: bold; color: var(--primary); }
+    </style>
 </head>
 <body>
 
-<div class="forest"></div>
+    <header>
+        <h1>Kedai Harinfood POS</h1>
+    </header>
 
-<div class="leaf leaf1">🍃</div>
-<div class="leaf leaf2">🍃</div>
-<div class="leaf leaf3">🍃</div>
-<div class="leaf leaf4">🍃</div>
+    <div class="container">
+        <div id="loading">Memuat data produk dari Google Sheets...</div>
+        
+        <div id="main-content" style="display:none;">
+            <h2 class="section-title">Daftar Menu</h2>
+            <div class="menu-grid" id="menu-container"></div>
 
-<div class="scene">
-
-    <img src="libur.png" class="shop" alt="Harinfood Tutup">
-
-    <img src="harinfood.webp" class="girl" alt="Anak Datang">
-
-</div>
-
-<div class="message">
-    <h1>🌿 Harinfood Sedang Libur 🌿</h1>
-
-    <p>
-        Mohon maaf, kedai sedang libur sementara.
-        Silakan kembali lagi pada jam operasional berikutnya.
-    </p>
-
-    <div class="info">
-        Terima kasih atas kunjungannya ❤️
+            <h2 class="section-title">Keranjang Belanja</h2>
+            <div class="cart-box">
+                <div id="cart-container">
+                    <p style="color:#7f8c8d; text-align:center; padding: 10px 0;">Keranjang kosong</p>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<audio id="music" autoplay loop>
-    <source src="aduh.mp3" type="audio/mpeg">
-</audio>
+    <div class="footer-bar">
+        <div class="total-section">
+            <h4>Total Bayar</h4>
+            <p id="total-harga">Rp 0</p>
+        </div>
+        <button class="btn-checkout" id="btn-checkout" disabled onclick="checkout()">Simpan Transaksi</button>
+    </div>
 
-<script src="script.js"></script>
+    <script>
+        // GANTI URL DI BAWAH INI DENGAN URL WEB APP GOOGLE APPS SCRIPT ANDA
+        const API_URL = "SALIN_URL_WEB_APP_DI_SINI";
 
+        let produkList = [];
+        let keranjang = {};
+
+        // Ambil data produk secara otomatis dari Google Sheets saat aplikasi dibuka
+        async function fetchProduk() {
+            try {
+                let response = await fetch(API_URL);
+                produkList = await response.json();
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+                renderMenu();
+            } catch (error) {
+                document.getElementById('loading').innerText = "Gagal memuat data. Periksa koneksi internet atau URL API Anda.";
+                console.error(error);
+            }
+        }
+
+        function renderMenu() {
+            const container = document.getElementById('menu-container');
+            container.innerHTML = '';
+            produkList.forEach(p => {
+                container.innerHTML += `
+                    <div class="menu-card" onclick="tambahKeKeranjang('${p.id}')">
+                        <h3>${p.nama}</h3>
+                        <p>Rp ${p.harga.toLocaleString('id-ID')}</p>
+                        <button class="btn-add">Tambah</button>
+                    </div>
+                `;
+            });
+        }
+
+        function tambahKeKeranjang(id) {
+            const produk = produkList.find(p => p.id === id);
+            if (keranjang[id]) {
+                keranjang[id].qty += 1;
+            } else {
+                keranjang[id] = { nama: produk.nama, harga: produk.harga, qty: 1 };
+            }
+            updateKeranjang();
+        }
+
+        function ubahQty(id, delta) {
+            if (keranjang[id]) {
+                keranjang[id].qty += delta;
+                if (keranjang[id].qty <= 0) {
+                    delete keranjang[id];
+                }
+            }
+            updateKeranjang();
+        }
+
+        function updateKeranjang() {
+            const container = document.getElementById('cart-container');
+            const totalEl = document.getElementById('total-harga');
+            const btnCheckout = document.getElementById('btn-checkout');
+            
+            container.innerHTML = '';
+            let total = 0;
+            let hasItem = false;
+
+            for (let id in keranjang) {
+                hasItem = true;
+                let item = keranjang[id];
+                let subtotal = item.harga * item.qty;
+                total += subtotal;
+
+                container.innerHTML += `
+                    <div class="cart-item">
+                        <div>
+                            <strong>${item.nama}</strong><br>
+                            <span style="color:#7f8c8d; font-size:0.85rem;">Rp ${item.harga.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div class="cart-item-qty">
+                            <button class="btn-qty" onclick="ubahQty('${id}', -1)">-</button>
+                            <span>${item.qty}</span>
+                            <button class="btn-qty" onclick="ubahQty('${id}', 1)">+</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (!hasItem) {
+                container.innerHTML = '<p style="color:#7f8c8d; text-align:center; padding: 10px 0;">Keranjang kosong</p>';
+                btnCheckout.disabled = true;
+            } else {
+                btnCheckout.disabled = false;
+            }
+
+            totalEl.innerText = "Rp " + total.toLocaleString('id-ID');
+            totalEl.dataset.value = total;
+        }
+
+        async function checkout() {
+            const btnCheckout = document.getElementById('btn-checkout');
+            btnCheckout.disabled = true;
+            btnCheckout.innerText = "Menyimpan...";
+
+            let detailArray = [];
+            let total = document.getElementById('total-harga').dataset.value;
+
+            for (let id in keranjang) {
+                detailArray.push(`${keranjang[id].nama} (x${keranjang[id].qty})`);
+            }
+            let detailTeks = detailArray.join(", ");
+
+            try {
+                let response = await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        detail: detailTeks,
+                        total: parseInt(total)
+                    })
+                });
+                let result = await response.json();
+
+                if (result.status === "SUCCESS") {
+                    alert("Transaksi Berhasil Disimpan!\nID: " + result.id);
+                    keranjang = {};
+                    updateKeranjang();
+                } else {
+                    alert("Gagal menyimpan transaksi: " + result.message);
+                }
+            } catch (error) {
+                alert("Terjadi kesalahan jaringan atau sistem.");
+                console.error(error);
+            } finally {
+                btnCheckout.disabled = false;
+                btnCheckout.innerText = "Simpan Transaksi";
+            }
+        }
+
+        // Jalankan fungsi ambil data produk saat web dimuat
+        window.onload = fetchProduk;
+    </script>
 </body>
 </html>
+
